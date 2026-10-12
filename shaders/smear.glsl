@@ -1,4 +1,4 @@
-// smear.glsl - S: bristle drag of Buffer A (iChannel0, linear colour).
+// smear.glsl - S: bristle drag of the wet background (paint.glsl, linear colour).
 //
 // A comb of 2-9 px bristles parallel to the drag; each bristle shows the paint
 // picked up at its own hashed distance upstream, so neighbouring bristles carry
@@ -16,12 +16,8 @@ float dragLen(vec2 p) {
     return band * mix(70.0, 40.0, topRight) * (1.0 - 0.8 * burstMask(p)) * (1.0 - 0.85 * lowRight) * PX;
 }
 
-vec3 paintAt(vec2 p) {
-    return texture(iChannel0, p * iResolution.y / iResolution.xy).rgb;
-}
-
 vec3 smear(vec2 fragCoord, vec2 p) {
-    vec3 col = paintAt(p);
+    vec3 col = paintAt(p, false);
 #ifndef NO_SMEAR
     float L = dragLen(p);
     if (L > 0.5 * PX) {
@@ -32,7 +28,7 @@ vec3 smear(vec2 fragCoord, vec2 p) {
         vec3 hb = hash33(vec3(floor(lc / wb), wb, 7.0));
         float wet = hb.y * hb.y * smoothstep(0.1, 0.5, noise(p * vec2(6.0, 9.0) + hb.z));
         if (wet > 0.02)
-            col = mix(col, paintAt(p - dir * L * (0.2 + 0.8 * hb.x)), 0.85 * wet);
+            col = mix(col, paintAt(p - dir * L * (0.2 + 0.8 * hb.x), true), 0.85 * wet);
     }
 #endif
     return col;

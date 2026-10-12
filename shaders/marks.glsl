@@ -138,17 +138,45 @@ void bgHeroes(inout vec3 col, vec2 p) {
     over(col, hexColor(0x7a2a7a), 0.5 * fill(sdTaper(p, R(840.0, 600.0), R(855.0, 790.0), 0.002, 0.004), PX * 1.5));
 }
 
-// ---- M0: dust haze -- the unresolved spray left over the night sky -------------
-// Per-pixel speckle (not stamps): red-orange and violet pigment dust, densest
-// around the burst and along the upper tear, thin over the rest of the sky.
-void dustHaze(inout vec3 col, vec2 fragCoord, vec2 p) {
-    float t = tearCoord(p);
-    float sky = 1.0 - smoothstep(-0.02, 0.08, t);
-    float dens = sky * (0.003 + 0.10 * burstMask(p) * smoothstep(0.35, 0.6, p.y)
-                        + 0.03 * smoothstep(0.4, 0.9, p.y) * smoothstep(0.1, 0.5, p.x));
-    vec2 cell = floor(fragCoord * (816.0 / iResolution.y) / 1.5);
-    vec3 h = hash33(vec3(cell, 131.0));
-    if (h.z > dens) return;
-    vec3 dc = h.x < 0.5 ? hexColor(0xb83a38) : (h.x < 0.8 ? hexColor(0x6a2a90) : hexColor(0xd06aa8));
-    over(col, dc, 0.25 + 0.5 * h.y);
+// ---- M0: dust haze -- the spray left over the night sky --------------------------
+// Red-orange and violet pigment dots, densest around the burst and along the
+// upper tear, thin over the rest of the sky. Each 3 px cell holds at most one
+// dot at a jittered position; sizes are power-law (mostly sub-pixel, a few up
+// to ~2.5 px) and the density clumps, so the dust never reads as a grid.
+// Animated: slow drift down the tear plus per-dot twinkle.
+float dustDensity(vec2 p) {
+    float sky = 1.0 - smoothstep(-0.02, 0.08, tearCoord(p));
+    return sky * (0.003 + 0.10 * burstMask(p) * smoothstep(0.35, 0.6, p.y)
+                  + 0.03 * smoothstep(0.4, 0.9, p.y) * smoothstep(0.1, 0.5, p.x));
+}
+
+void dustHaze(inout vec3 col, vec2 p) {
+    if (tearCoord(p) > 0.08) return;
+    // the dots drift slowly away from the burst, down the tear; they live in
+    // the drifting frame q, the density map stays fixed on the canvas
+    vec2 drift = -DIR * 0.003 * iTime;
+    vec2 q = p - drift;
+    float cs = 3.0 * PX;
+    vec2 g = floor(q / cs);
+    for (int j = -1; j <= 1; j++) {
+        for (int i = -1; i <= 1; i++) {
+            vec2 id = g + vec2(i, j);
+            vec3 h = hash33(vec3(id, 131.0));
+            vec2 c = (id + 0.5 + (h.xy - 0.5)) * cs;     // anywhere in the cell
+            // same mean coverage as one dot per 1.5 px, but clumped
+            float d = 3.5 * dustDensity(c + drift);
+            if (h.z > 2.0 * d) continue;               // cheap reject before the noise
+            if (h.z > d * (0.15 + 1.85 * clump(c + drift, 131.0))) continue;
+            float s = hash12(id + 7.0);
+            float r = PX * (0.25 + 2.3 * pow(s, 5.0));
+            float k = hash12(id + 8.0);
+            vec3 dc = k < 0.5 ? hexColor(0xb83a38) : (k < 0.8 ? hexColor(0x6a2a90) : hexColor(0xd06aa8));
+            // big dots are a little softer and fainter than the tiny sparks
+            float a = (0.22 + 0.38 * hash12(id + 9.0)) * mix(1.0, 0.75, s);
+            // each dot twinkles at its own slow rate and phase
+            float tw = hash12(id + 10.0);
+            a *= 0.65 + 0.35 * sin(iTime * (0.6 + 1.8 * tw) + TAU * hash12(id + 11.0));
+            over(col, dc, a * fill(length(q - c) - r, PX * mix(0.5, 1.0, s)));
+        }
+    }
 }

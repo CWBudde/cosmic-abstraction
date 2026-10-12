@@ -1,8 +1,8 @@
-// paint.glsl - Buffer A: the wet background before the bristle drag.
+// paint.glsl - the wet background before the bristle drag, in LINEAR colour.
 //
-// Everything here is paint that the Image pass (smear.glsl) drags along the
-// tear, so it is rendered once into a half-float buffer in LINEAR colour and
-// read back with cheap texture fetches. Layers, back to front:
+// Everything here is paint that smear.glsl drags along the tear: background()
+// is evaluated at the pixel and, where the drag is wet, once more upstream.
+// Layers, back to front:
 //   L0  colour field   normalised Gaussian blend of ~50 hand-placed anchors
 //   L1  soft washes    burst glow, torn orange flame masses, hazes
 //   L1d coral front    sharp, drippy coral/pink front on the right (y ~ 500)
@@ -242,21 +242,22 @@ void tearChunks(inout vec3 col, vec2 p) {
 }
 
 // ---- the wet background -------------------------------------------------------
-vec3 background(vec2 p, vec2 pd) {
+// pd: p shifted by the slow drift of the scattered strokes along the tear.
+// The upstream copy the bristle drag picks up skips the two finest (and most
+// expensive) layers, mottle and dry brush: they only show in dry bristles.
+vec3 background(vec2 p, vec2 pd, bool upstream) {
     vec3 col = coralFront(colourField(p), p);
     softWashes(col, p);
     warmBrush(col, p);
-    mottle(col, p);
-    dryBrush(col, pd);
+    if (!upstream) {
+        mottle(col, p);
+        dryBrush(col, pd);
+    }
     smudges(col, p);
     tearChunks(col, pd);
     return col;
 }
 
-void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    PX = 1.0 / iResolution.y;
-    vec2 p = fragCoord / iResolution.y;
-    // the scattered strokes drift slowly along the tear
-    vec2 pd = p - DIR * 0.004 * iTime;
-    fragColor = vec4(background(p, pd), 1.0);
+vec3 paintAt(vec2 p, bool upstream) {
+    return background(p, p - DIR * 0.004 * iTime, upstream);
 }

@@ -12,9 +12,9 @@ flag, multipass (`#bufferA`) and `imgstat` documentation.
 | Path                                                                 | Content                                                                              |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `shaders/main.glsl`                                                  | Image pass: bristle drag, marks, grade; header lists all layers and debug defines    |
-| `shaders/paint.glsl`                                                 | Buffer A: the wet background before the drag                                         |
+| `shaders/paint.glsl`                                                 | the wet background before the drag                                                   |
 | `shaders/field.glsl`                                                 | shared constants, shape and paint helpers, zone masks, colour field                  |
-| `shaders/smear.glsl`, `marks.glsl`, `grade.glsl`                     | the Image-pass layers                                                                |
+| `shaders/smear.glsl`, `marks.glsl`, `grade.glsl`                     | the remaining layers                                                                 |
 | `shaders/rival_{a,b,c}*.glsl`                                        | the three competing prototypes (record, still renderable); A won and became the base |
 | `shaders/common.glsl`                                                | hashes, noise, colour helpers                                                        |
 | `reference/reference_less.png`                                       | the target image (1456x816, not versioned)                                           |
