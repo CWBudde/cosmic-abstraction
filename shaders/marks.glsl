@@ -1,12 +1,8 @@
-// marks.glsl - crisp background marks drawn over the smeared paint. These are
-// part of the background (they stay with -D BG_ONLY=1):
+// marks.glsl - crisp marks drawn over the smeared paint:
 //   M0  dust haze    unresolved 1-2 px pigment dust over the burst and sky
 //   M1  slashes      hero dark slashes, violet under-stroke, dark wedge, blobs
-//   M1b burst chunks soft translucent upright violet sheets in the burst
-//   M1c burst runs   thin near-vertical torn runs (gravity) in the burst
 //   M2  grit         dense 1 px light/dark pigment specks in the tear band
-//   M3  ink dust     fine clumped ink dust (inkScale; the larger flung specks
-//                    are particle P5)
+//   M3  ink dust     fine clumped ink dust (inkScale)
 //   M4  drips        pale runs down the pink lower right
 //   M5  heroes       top violet streak, pale flakes, leaf drips, dark drop
 
@@ -99,13 +95,10 @@ void inkScale(inout vec3 col, vec2 p, float cs, float seed, vec2 size, float den
     }
 }
 
-// Fine ink dust is background texture; the resolved specks are particles.
+// Fine ink dust over the warm side.
 void inkDust(inout vec3 col, vec2 p) {
     float lr = smoothstep(1.1, 1.35, p.x) * smoothstep(0.6, 0.4, p.y);
-    inkScale(col, p, 0.007, 41.0, vec2(0.5, 1.4), 0.25 * (1.0 - 0.6 * lr), 0.0);
-}
-void inkSpecks(inout vec3 col, vec2 p) {
-    inkScale(col, p, 0.016, 43.0, vec2(0.9, 6.0), 0.30, 0.25);  // specks and flung drops
+    inkScale(col, p, 0.007, 41.0, vec2(0.5, 1.4), 0.15 * (1.0 - 0.6 * lr), 0.0);
 }
 
 // ---- M4: drips -- pale runs down the pink lower right -----------------------------
@@ -131,8 +124,8 @@ void bgHeroes(inout vec3 col, vec2 p) {
     // top violet streak at u ~ 0.5: vertical, darker at the top edge
     vec2 tv = p - R(726.0, 30.0);
     float ts = torn(sdEllipse(rot(-0.08) * tv, vec2(0.056, 0.095)), p, 50.0, 0.012);
-    vec3 tc = mix(hexColor(0x5a3498), hexColor(0x8a62cc), smoothstep(0.05, -0.07, tv.y) * smoothstep(-0.06, 0.0, -abs(tv.x)));
-    stamp(col, tc, p, 0.5, 0.9 * dryFillA(ts, PX * 1.5, p, 0.014, 0.8, 1.5708));
+    vec3 tc = mix(hexColor(0x3a2078), hexColor(0x7448b4), smoothstep(0.05, -0.07, tv.y) * smoothstep(-0.06, 0.0, -abs(tv.x)));
+    stamp(col, tc, p, 0.7, 0.8 * dryFillA(ts, PX * 1.5, p, 0.03, 0.8, 1.5708));
     // pale flakes: top edge, lavender flake left of the leaves
     over(col, hexColor(0xf4a8d8), fill(sdFlake(p - R(1310.0, 14.0), vec2(0.05, 0.016), 2.0, 0.25), PX));
     over(col, hexColor(0xe8a0e0), fill(sdFlake(p - R(818.0, 26.0), vec2(0.006, 0.02), 6.0, 0.2), PX));
@@ -159,57 +152,3 @@ void dustHaze(inout vec3 col, vec2 fragCoord, vec2 p) {
     vec3 dc = h.x < 0.5 ? hexColor(0xb83a38) : (h.x < 0.8 ? hexColor(0x6a2a90) : hexColor(0xd06aa8));
     over(col, dc, 0.25 + 0.5 * h.y);
 }
-
-// ---- M1b: burst chunks -- soft translucent violet sheets hanging in the burst ----
-// Torn, mostly upright violet/magenta chunks (the paint that the explosion tore
-// off the tear), overlapping and translucent, with dry fringes.
-void burstStreaks(inout vec3 col, vec2 p) {
-    if (burstMask(p) < 0.004 && p.y < 0.65) return;
-    vec2 cell = vec2(0.045, 0.075);     // > half the largest chunk: no clipping
-    vec2 g = floor(p / cell);
-    for (int j = -1; j <= 1; j++) {
-        for (int i = -1; i <= 1; i++) {
-            vec2 id = g + vec2(i, j);
-            vec3 h = hash33(vec3(id, 61.0));
-            vec2 c = (id + 0.5 + (h.xy - 0.5) * 0.8) * cell;
-            float t = tearCoord(c);
-            float z = burstMask(c) * smoothstep(0.35, 0.55, c.y) * smoothstep(-0.22, -0.06, t) * smoothstep(0.06, -0.02, t);
-            if (h.z > 0.8 * z) continue;
-            float s = hash12(id + 1.0);
-            vec2 ab = PX * (6.0 + 14.0 * s * s) * vec2(1.0, 1.3 + 1.2 * hash12(id + 2.0));
-            float a = (hash12(id + 3.0) - 0.5) * 0.5;               // upright, +-15 deg
-            float sd = sdFlake(rot(-a) * (p - c), ab, h.x * 70.0, 0.45);
-            sd = torn(sd, p, 120.0, ab.x * 0.25);
-            float k = hash12(id + 4.0);
-            vec3 sc = k < 0.45 ? hexColor(0x6a3ab0) : (k < 0.75 ? hexColor(0x8a48c0) : (k < 0.9 ? hexColor(0xa04aa0) : hexColor(0x2a1050)));
-            stamp(col, sc, p, 0.4, (0.25 + 0.25 * hash12(id + 5.0)) * dryFillA(sd, PX * 1.5, p, ab.y * 0.6, 0.8, 1.5708 + a));
-        }
-    }
-}
-
-// ---- M1c: burst runs -- thin near-vertical torn runs and drips in the burst ----
-void burstRuns(inout vec3 col, vec2 p) {
-    if (burstMask(p) < 0.004 && p.y < 0.65) return;
-    vec2 cell = vec2(0.018, 0.06);
-    vec2 g = floor(p / cell);
-    for (int j = -1; j <= 1; j++) {
-        for (int i = -1; i <= 1; i++) {
-            vec2 id = g + vec2(i, j);
-            vec3 h = hash33(vec3(id, 61.0));
-            vec2 c = (id + 0.5 + (h.xy - 0.5) * 0.8) * cell;
-            float z = burstMask(c) * smoothstep(0.35, 0.6, c.y);
-            z = max(z, smoothstep(0.7, 0.95, c.y) * smoothstep(0.75, 0.85, c.x) * smoothstep(1.15, 1.05, c.x));
-            if (h.z > 0.6 * z) continue;
-            float len = PX * (8.0 + 35.0 * hash12(id + 1.0));
-            float wid = PX * (2.0 + 7.0 * pow(hash12(id + 2.0), 2.0));
-            float a = 1.57 + (hash12(id + 3.0) - 0.5) * 0.6;
-            vec2 d = vec2(cos(a), sin(a)) * len;
-            float sd = torn(sdTaper(p, c + d, c - d, wid * 0.3, wid), p, 300.0, wid * 0.8);
-            float k = hash12(id + 4.0);
-            vec3 sc = k < 0.35 ? hexColor(0x3a1c78) : (k < 0.6 ? hexColor(0x6a38a8) : (k < 0.8 ? hexColor(0xd8582c) : hexColor(0x160a2c)));
-            float fade = 0.6 + 0.4 * smoothstep(-1.0, 0.5, dot(p - c, d) / dot(d, d));   // paler tail
-            paintA(col, sc, 0.65 * fade * fill(sd, PX * 1.5), p, 0.35, 0.4, a);
-        }
-    }
-}
-

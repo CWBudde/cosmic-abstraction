@@ -1,4 +1,4 @@
-# Cosmic Abstraction - GLSL recreation of reference/reference.png.
+# Cosmic Abstraction - GLSL recreation of reference/reference_less.png.
 # Extra runner flags can be appended, e.g. `just shot 0,15 -D EXPOSURE=1.2`.
 
 # A stray /mnt/projekte/Code/.git (not a real repo) breaks Go's VCS stamping.
@@ -92,7 +92,7 @@ shot times="0" *args:
     go run . -size {{size}} -shot out/shot.png -times {{times}} {{args}}
 
 # Shots plus side-by-side montages against the reference or an earlier render (out/*_cmp.png)
-compare ref="reference/reference.png" times="0" *args:
+compare ref="reference/reference_less.png" times="0" *args:
     go run . -size {{size}} -shot out/shot.png -times {{times}} -compare {{ref}} {{args}}
 
 # Frame sequence (start and duration in seconds) into out/clip/, encoded as out/clip.mp4
@@ -122,23 +122,17 @@ bundle *args:
 #################################
 
 # Quantitative description of an image: palette, colour map, stroke directions, block edges, texture
-stat img="reference/reference.png":
+stat img="reference/reference_less.png":
     go run ./cmd/imgstat analyze {{img}}
 
 # Style/composition score of renders against the reference (lower = better), e.g. `just score out/a.png out/b.png`
 score +renders="out/shot.png":
-    go run ./cmd/imgstat score reference/reference.png {{renders}}
-
-# Background-only render (-D BG_ONLY=1, no sparks/flakes/specks) scored against reference/reference_less.png
-score-bg *args:
-    go run . -size {{size}} -shot out/bg.png -times 0 -compare reference/reference_less.png -D BG_ONLY=1 {{args}}
-    go run ./cmd/imgstat score reference/reference_less.png out/bg.png
+    go run ./cmd/imgstat score reference/reference_less.png {{renders}}
 
 # 2x2 diagnostic montage: render | reference / dE heatmap | orientation difference
 diff render="out/shot.png" out="out/diff.png":
-    go run ./cmd/imgstat diff reference/reference.png {{render}} {{out}}
+    go run ./cmd/imgstat diff reference/reference_less.png {{render}} {{out}}
 
-# Regenerate docs/reference-stats.txt and docs/reference-less-stats.txt
+# Regenerate docs/reference-less-stats.txt
 stat-ref:
-    go run ./cmd/imgstat analyze reference/reference.png > docs/reference-stats.txt
     go run ./cmd/imgstat analyze reference/reference_less.png > docs/reference-less-stats.txt

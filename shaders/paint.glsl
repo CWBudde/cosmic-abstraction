@@ -11,9 +11,8 @@
 //   L2  dry brush      soft blue sky smears low left, navy teardrop dashes in
 //                      the lower band, 35 deg hair lines + dashes
 //                      along the tear (steered to ~50 deg top right)
-//   L2b smudges        soft irregular violet/ink blotches in the tear band
+//   L2b smudges        35 deg violet/magenta/ink smears in the tear band
 //   L2c tear chunks    mid-size torn violet/magenta flakes along the tear
-//   L2d gravity runs   broken vertical violet runs below the burst (Rival C)
 
 #include "common.glsl"
 #include "field.glsl"
@@ -41,12 +40,12 @@ vec3 coralFront(vec3 col, vec2 p) {
     float yf = 495.0 + 18.0 * (noise(vec2(x * 0.01, 1.0)) - 0.5)
              + 45.0 * pow(noise(vec2(x * 0.06, 3.0)), 4.0);        // drips hang down
     float yPx = 816.0 - p.y * 816.0;
-    float m = smoothstep(yf - 10.0, yf + 10.0, yPx);
+    float m = smoothstep(yf - 45.0, yf + 45.0, yPx);
     vec3 above = colourField(p + vec2(0.0, 0.07));
     vec3 below = colourField(p - vec2(0.0, 0.07));
     // fade out well inside the early-out box, so it leaves no seams
     float w = smoothstep(1.2, 1.35, p.x) * smoothstep(0.2, 0.26, p.y) * smoothstep(0.5, 0.44, p.y);
-    return mix(col, mix(above, below, m), 0.8 * w);
+    return mix(col, mix(above, below, m), 0.5 * w);
 }
 
 // ---- L1b: warm brush -- soft long strokes that modulate the warm paint ------------
@@ -203,15 +202,15 @@ void smudges(inout vec3 col, vec2 p) {
             vec3 h = hash33(vec3(id, 71.0));
             vec2 c = (id + 0.5 + (h.xy - 0.5) * 0.9) * cs;
             float t = tearCoord(c);
-            float z = exp(-pow((t - 0.12) / 0.16, 2.0)) * (1.0 - smoothstep(0.6, 0.85, c.y));
+            float z = exp(-pow((t - 0.15) / 0.14, 2.0)) * (1.0 - smoothstep(0.6, 0.85, c.y)) * smoothstep(0.05, 0.25, c.y);
             if (h.z > 0.7 * z) continue;
             float s = hash12(id + 1.0);
-            vec2 ab = vec2(0.008 + 0.03 * s, 0.006 + 0.014 * s);
-            float ang = hash12(id + 2.0) * PI;
+            vec2 ab = vec2(0.015 + 0.05 * s, 0.005 + 0.012 * s);   // long along the tear
+            float ang = A35 + (hash12(id + 2.0) - 0.5) * 0.4;
             float sd = sdBlob(p, c, ab, ang, 0.9, hash12(id + 3.0) * 40.0);
             float k = hash12(id + 4.0);
-            vec3 sc = k < 0.45 ? hexColor(0x2a1050) : (k < 0.8 || t < 0.05 ? hexColor(0x5a2a98) : hexColor(0xb05ab0));
-            paint(col, sc, 0.5 * fill(sd, ab.y * 0.5), p, 0.45, 0.4);
+            vec3 sc = k < 0.35 ? hexColor(0x2a1050) : (k < 0.6 || t < 0.05 ? hexColor(0x5e2a9e) : hexColor(0x8a1c78));
+            paint(col, sc, 0.55 * fill(sd, ab.y * 0.4), p, 0.45, 0.4);
         }
     }
 }
@@ -242,21 +241,6 @@ void tearChunks(inout vec3 col, vec2 p) {
     }
 }
 
-// ---- L2d: gravity runs (from Rival C) -- pigment from the burst running down -----
-void gravityRuns(inout vec3 col, vec2 p) {
-    float u = p.x / ASPECT;
-    float runM = smoothstep(0.12, 0.0, abs(u - 0.38) - 0.12) * smoothstep(0.45, 0.85, p.y);
-    if (runM <= 0.0) return;
-    float runF = smoothstep(0.3, 0.7, fbm(p * 3.0 + 9.0, 3));
-    float run = noise(vec2(p.x * 160.0, p.y * 3.0)) * 0.6 + noise(vec2(p.x * 420.0, p.y * 6.0)) * 0.4;
-    col *= 1.0 + 0.3 * (run - 0.5) * runM * runF;
-    // where pigment collected it runs down as broken violet/magenta streaks
-    float runP = smoothstep(0.66, 0.85, noise(vec2(p.x * 70.0, p.y * 2.0 + 5.0))) * runM * runF;
-    runP *= smoothstep(0.45, 0.7, noise(vec2(p.x * 70.0 + 3.0, p.y * 7.0)));
-    vec3 runC = mix(hexColor(0x4a2a88), hexColor(0x9a3a8a), noise(vec2(p.x * 60.0, 1.0)));
-    col = mix(col, runC, 0.7 * runP);
-}
-
 // ---- the wet background -------------------------------------------------------
 vec3 background(vec2 p, vec2 pd) {
     vec3 col = coralFront(colourField(p), p);
@@ -266,7 +250,6 @@ vec3 background(vec2 p, vec2 pd) {
     dryBrush(col, pd);
     smudges(col, p);
     tearChunks(col, pd);
-    gravityRuns(col, p);
     return col;
 }
 
